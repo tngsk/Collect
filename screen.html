@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>SITU Workshop Screen</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #0f0f11; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        #chart-container { width: 90vw; height: 80vh; }
+    </style>
+</head>
+<body>
+    <div id="chart-container">
+        <h1 style="text-align: center; font-family: sans-serif; color: #555;">Waiting for data...</h1>
+    </div>
+
+    <script>
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const socket = new WebSocket(`${protocol}://${location.host}/ws/screen`);
+
+        socket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "show_result") {
+                const figure = JSON.parse(msg.chart_data);
+                Plotly.newPlot('chart-container', figure.data, figure.layout, {displayModeBar: false, responsive: true});
+            }
+        };
+        socket.onclose = () => { setTimeout(() => location.reload(), 2000); };
+    </script>
+</body>
+</html>

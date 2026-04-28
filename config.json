@@ -1,0 +1,10 @@
+{
+  "workshop_title": "SITU Sound Evaluation Workshop",
+  "questions": [
+    { "id": "Q1", "title": "音源A: ピンクノイズ" },
+    { "id": "Q2", "title": "音源B: 1/f ゆらぎ" },
+    { "id": "Q3", "title": "音源C: 環境音（都市）" },
+    { "id": "Q4", "title": "音源D: 環境音（森林）" },
+    { "id": "Q5", "title": "音源E: ピュアトーン" }
+  ]
+}

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>Sound Eval</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg-color: #0f0f11;
+                --text-color: #ffffff;
+                --accent-color: #ccff00;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                font-family: "Zen Kaku Gothic New", sans-serif;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+            }
+            body::before {
+                content: "";
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background-image: url('data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)" opacity="0.05"/%3E%3C/svg%3E');
+                pointer-events: none;
+                z-index: 50;
+            }
+            .phase-container {
+                display: none;
+                flex: 1;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+                text-align: center;
+            }
+            .phase-container.active {
+                display: flex;
+            }
+            h1 {
+                font-family: "Dela Gothic One", cursive;
+                font-size: 3rem;
+                margin: 0;
+                line-height: 1.1;
+            }
+            .choices-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 15px;
+                width: 100%;
+                max-width: 400px;
+                margin-top: 30px;
+            }
+            .choice-btn {
+                background: transparent;
+                border: 2px solid var(--text-color);
+                color: var(--text-color);
+                padding: 25px;
+                font-size: 1.5rem;
+                font-family: "Zen Kaku Gothic New", sans-serif;
+                font-weight: bold;
+                border-radius: 12px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                transform: translateY(20px);
+                opacity: 0;
+                animation: slideUp 0.4s forwards;
+            }
+            .choice-btn:nth-child(1) {
+                animation-delay: 0.1s;
+            }
+            .choice-btn:nth-child(2) {
+                animation-delay: 0.2s;
+            }
+            .choice-btn:nth-child(3) {
+                animation-delay: 0.3s;
+            }
+            .choice-btn:nth-child(4) {
+                animation-delay: 0.4s;
+            }
+            .choice-btn:active {
+                background: var(--accent-color);
+                color: var(--bg-color);
+                border-color: var(--accent-color);
+            }
+            .choice-btn:disabled {
+                opacity: 0.3 !important;
+                pointer-events: none;
+            }
+            @keyframes slideUp {
+                to {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="phase-WAITING" class="phase-container active">
+            <h1>LOOK AT<br />THE SCREEN</h1>
+            <p style="color: var(--accent-color); margin-top: 20px">
+                前方のスクリーンに注目してください
+            </p>
+        </div>
+
+        <div id="phase-EVALUATE" class="phase-container">
+            <h1 style="font-size: 2rem">HOW DID IT SOUND?</h1>
+            <div class="choices-grid" id="choices">
+                <button class="choice-btn" data-val="1_非常に不快">
+                    非常に不快
+                </button>
+                <button class="choice-btn" data-val="2_やや不快">
+                    やや不快
+                </button>
+                <button class="choice-btn" data-val="3_やや快適">
+                    やや快適
+                </button>
+                <button class="choice-btn" data-val="4_非常に快適">
+                    非常に快適
+                </button>
+            </div>
+        </div>
+
+        <div id="phase-FINISHED" class="phase-container">
+            <h1 style="color: var(--accent-color)">THANK YOU</h1>
+            <p>回答を記録しました</p>
+        </div>
+
+        <script>
+            let clientId = localStorage.getItem("situs_client_id");
+            if (!clientId) {
+                clientId = "user_" + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem("situs_client_id", clientId);
+            }
+
+            let socket;
+            let startTime = 0;
+
+            function connectWebSocket() {
+                const protocol = location.protocol === "https:" ? "wss" : "ws";
+                socket = new WebSocket(
+                    `${protocol}://${location.host}/ws/client/${clientId}`,
+                );
+
+                socket.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "phase_change") {
+                        switchPhase(msg.phase);
+                    }
+                };
+                socket.onclose = () => {
+                    setTimeout(connectWebSocket, 1000);
+                };
+            }
+
+            function switchPhase(phase) {
+                document
+                    .querySelectorAll(".phase-container")
+                    .forEach((el) => el.classList.remove("active"));
+                const basePhase = phase.split("_")[0];
+                const targetEl = document.getElementById(`phase-${basePhase}`);
+
+                if (targetEl) {
+                    targetEl.classList.add("active");
+                    if (basePhase === "EVALUATE") {
+                        startTime = performance.now();
+                        document
+                            .querySelectorAll(".choice-btn")
+                            .forEach((btn) => (btn.disabled = false));
+                    }
+                }
+            }
+
+            document.querySelectorAll(".choice-btn").forEach((btn) => {
+                btn.addEventListener("click", (e) => {
+                    document
+                        .querySelectorAll(".choice-btn")
+                        .forEach((b) => (b.disabled = true));
+                    const rt = performance.now() - startTime;
+                    socket.send(
+                        JSON.stringify({
+                            type: "submit",
+                            response: e.target.getAttribute("data-val"),
+                            rt: Math.round(rt),
+                        }),
+                    );
+                    switchPhase("FINISHED");
+                });
+            });
+
+            connectWebSocket();
+        </script>
+    </body>
+</html>
