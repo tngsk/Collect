@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
 # ==========================================
 # 1. コンフィグの読み込みと動的セットアップ
@@ -34,6 +35,13 @@ for q in config["questions"]:
 
 # FastAPIのバリデーション用に動的なEnumクラスを作成
 AllowedPhase = Enum("AllowedPhase", allowed_phases_dict)
+
+
+class SubmitMessage(BaseModel):
+    type: str = Field(..., pattern="^submit$")
+    response: str = Field(..., max_length=100)
+    rt: int = Field(..., ge=0)
+
 
 app = FastAPI()
 
@@ -241,14 +249,20 @@ async def websocket_client(websocket: WebSocket, client_id: str):
     try:
         while True:
             data = await websocket.receive_text()
-            msg = json.loads(data)
-            if msg["type"] == "submit":
+            try:
+                raw_msg = json.loads(data)
+                msg = SubmitMessage(**raw_msg)
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+            # Only allow submissions during EVALUATE phases
+            if state.current_phase.value.startswith("EVALUATE"):
                 save_data(
                     {
                         "client_id": client_id,
                         "phase": state.current_phase.value,
-                        "response": msg["response"],
-                        "rt": msg["rt"],
+                        "response": msg.response,
+                        "rt": msg.rt,
                     }
                 )
                 await update_screen()
