@@ -37,6 +37,9 @@ AllowedPhase = Enum("AllowedPhase", allowed_phases_dict)
 
 app = FastAPI()
 
+with open("screen.html", "r", encoding="utf-8") as f:
+    SCREEN_HTML = f.read()
+
 
 class ExperimentState:
     def __init__(self):
@@ -65,8 +68,7 @@ async def get_client_html():
 
 @app.get("/screen")
 async def get_screen_html():
-    with open("screen.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    return HTMLResponse(SCREEN_HTML)
 
 
 @app.get("/controller")
