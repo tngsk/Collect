@@ -159,7 +159,7 @@ async def set_phase(new_phase: AllowedPhase):
     for client in list(state.active_clients):
         try:
             await client.send_text(message)
-        except Exception:
+        except (RuntimeError, WebSocketDisconnect):
             pass
 
     if new_phase.value.startswith("SHOW_RESULT"):
@@ -225,7 +225,7 @@ async def update_screen():
                 await screen.send_text(
                     json.dumps({"type": "show_result", "chart_data": graph_json})
                 )
-            except Exception:
+            except (RuntimeError, WebSocketDisconnect):
                 pass
     except Exception as e:
         print(f"[ERROR] Update error: {e}")
