@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import collections
 from enum import Enum
 
 import pandas as pd
@@ -43,13 +44,26 @@ class ExperimentState:
         self.current_phase = AllowedPhase["WAITING"]  # type: ignore[index]
         self.active_clients = set()
         self.screen_sockets = set()
+        self.responses = []
 
 
 state = ExperimentState()
 DATA_FILE = "data.jsonl"
 
+# Load initial data from disk
+if os.path.exists(DATA_FILE):
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    state.responses.append(json.loads(line))
+    except Exception as e:
+        print(f"[WARNING] Could not load {DATA_FILE}: {e}")
+
 
 def save_data(data_dict):
+    # ⚡ Bolt: Cache responses in-memory to prevent sync disk read blocking async loop
+    state.responses.append(data_dict)
     with open(DATA_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(data_dict) + "\n")
 
@@ -171,26 +185,28 @@ async def set_phase(new_phase: AllowedPhase):
 async def update_screen():
     try:
         # 1. データの読み込み
-        df = pd.read_json(DATA_FILE, lines=True)
-        if not isinstance(df, pd.DataFrame) or "phase" not in df.columns:
+        # ⚡ Bolt: Use in-memory list instead of blocking async loop with synchronous pd.read_json
+        if not state.responses:
             print("[DEBUG] データが存在しないか、空です")
             return
 
         # 2. ターゲットフェーズの特定 (例: SHOW_RESULT_Q3 -> EVALUATE_Q3)
         target_phase = state.current_phase.value.replace("SHOW_RESULT", "EVALUATE")
-        df_filtered = df[df["phase"] == target_phase]
+        filtered_responses = [
+            r["response"] for r in state.responses if r.get("phase") == target_phase
+        ]
 
         print(
-            f"[DEBUG] {target_phase} の集計を開始。抽出されたデータ: {len(df_filtered)}件"
+            f"[DEBUG] {target_phase} の集計を開始。抽出されたデータ: {len(filtered_responses)}件"
         )
 
         # 3. グラフ用データの生成
-        if df_filtered.empty:
+        if not filtered_responses:
             counts = pd.DataFrame({"response": ["No Data"], "count": [0]})
         else:
             # 通常の集計処理
-            counts = df_filtered["response"].value_counts().reset_index()  # type: ignore[union-attr]
-            counts.columns = ["response", "count"]
+            counter = collections.Counter(filtered_responses)
+            counts = pd.DataFrame(list(counter.items()), columns=["response", "count"])
 
         title_text = f"RESULT: {target_phase}"  # グラフにタイトルをつける
 
