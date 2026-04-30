@@ -5,8 +5,10 @@ from enum import Enum
 
 import pandas as pd
 import plotly.express as px
-from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+import asyncio
+from fastapi import FastAPI, Response, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel
 
 # ==========================================
 # 1. コンフィグの読み込みと動的セットアップ
@@ -41,8 +43,8 @@ app = FastAPI()
 class ExperimentState:
     def __init__(self):
         self.current_phase = AllowedPhase["WAITING"]  # type: ignore[index]
-        self.active_clients = set()
-        self.screen_sockets = set()
+        self.client_queues = set()
+        self.screen_queues = set()
 
 
 state = ExperimentState()
@@ -149,16 +151,39 @@ async def favicon():
 
 
 # ==========================================
-# 3. API & WebSocket ロジック
+# 3. API & SSE ロジック
 # ==========================================
+class SubmitData(BaseModel):
+    client_id: str
+    response: str
+    rt: int
+
+
+@app.post("/submit")
+async def submit_response(data: SubmitData):
+    if not state.current_phase.value.startswith("EVALUATE"):
+        return {"status": "ignored", "reason": "not in evaluate phase"}
+
+    save_data(
+        {
+            "client_id": data.client_id,
+            "phase": state.current_phase.value,
+            "response": data.response,
+            "rt": data.rt,
+        }
+    )
+    await update_screen()
+    return {"status": "ok"}
+
+
 @app.post("/control/phase/{new_phase}")
 async def set_phase(new_phase: AllowedPhase):
     state.current_phase = new_phase
 
     message = json.dumps({"type": "phase_change", "phase": new_phase.value})
-    for client in list(state.active_clients):
+    for q in list(state.client_queues):
         try:
-            await client.send_text(message)
+            await q.put(message)
         except Exception:
             pass
 
@@ -220,48 +245,54 @@ async def update_screen():
 
         # 6. スクリーンへの送信
         graph_json = fig.to_json()
-        for screen in list(state.screen_sockets):
+        message = json.dumps({"type": "show_result", "chart_data": graph_json})
+        for q in list(state.screen_queues):
             try:
-                await screen.send_text(
-                    json.dumps({"type": "show_result", "chart_data": graph_json})
-                )
+                await q.put(message)
             except Exception:
                 pass
     except Exception as e:
         print(f"[ERROR] Update error: {e}")
 
 
-@app.websocket("/ws/client/{client_id}")
-async def websocket_client(websocket: WebSocket, client_id: str):
-    await websocket.accept()
-    state.active_clients.add(websocket)
-    await websocket.send_text(
-        json.dumps({"type": "phase_change", "phase": state.current_phase.value})
-    )
-    try:
-        while True:
-            data = await websocket.receive_text()
-            msg = json.loads(data)
-            if msg["type"] == "submit":
-                save_data(
-                    {
-                        "client_id": client_id,
-                        "phase": state.current_phase.value,
-                        "response": msg["response"],
-                        "rt": msg["rt"],
-                    }
-                )
-                await update_screen()
-    except WebSocketDisconnect:
-        state.active_clients.remove(websocket)
+@app.get("/sse/client")
+async def sse_client(request: Request):
+    async def event_generator():
+        q = asyncio.Queue()
+        state.client_queues.add(q)
+        try:
+            # 接続時に現在のフェーズを送信
+            initial_msg = json.dumps({"type": "phase_change", "phase": state.current_phase.value})
+            yield f"data: {initial_msg}\n\n"
+
+            while True:
+                if await request.is_disconnected():
+                    break
+                # キューからメッセージを取得
+                message = await q.get()
+                yield f"data: {message}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            state.client_queues.remove(q)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@app.websocket("/ws/screen")
-async def websocket_screen(websocket: WebSocket):
-    await websocket.accept()
-    state.screen_sockets.add(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        state.screen_sockets.remove(websocket)
+@app.get("/sse/screen")
+async def sse_screen(request: Request):
+    async def event_generator():
+        q = asyncio.Queue()
+        state.screen_queues.add(q)
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                message = await q.get()
+                yield f"data: {message}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            state.screen_queues.remove(q)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

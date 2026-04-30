@@ -15,17 +15,15 @@
     </div>
 
     <script>
-        const protocol = location.protocol === "https:" ? "wss" : "ws";
-        const socket = new WebSocket(`${protocol}://${location.host}/ws/screen`);
+        const eventSource = new EventSource('/sse/screen');
 
-        socket.onmessage = (event) => {
+        eventSource.onmessage = (event) => {
             const msg = JSON.parse(event.data);
             if (msg.type === "show_result") {
                 const figure = JSON.parse(msg.chart_data);
                 Plotly.newPlot('chart-container', figure.data, figure.layout, {displayModeBar: false, responsive: true});
             }
         };
-        socket.onclose = () => { setTimeout(() => location.reload(), 2000); };
     </script>
 </body>
 </html>

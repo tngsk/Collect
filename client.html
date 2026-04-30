@@ -147,23 +147,17 @@
                 localStorage.setItem("situs_client_id", clientId);
             }
 
-            let socket;
+            let eventSource;
             let startTime = 0;
 
-            function connectWebSocket() {
-                const protocol = location.protocol === "https:" ? "wss" : "ws";
-                socket = new WebSocket(
-                    `${protocol}://${location.host}/ws/client/${clientId}`,
-                );
+            function connectSSE() {
+                eventSource = new EventSource('/sse/client');
 
-                socket.onmessage = (event) => {
+                eventSource.onmessage = (event) => {
                     const msg = JSON.parse(event.data);
                     if (msg.type === "phase_change") {
                         switchPhase(msg.phase);
                     }
-                };
-                socket.onclose = () => {
-                    setTimeout(connectWebSocket, 1000);
                 };
             }
 
@@ -186,23 +180,34 @@
             }
 
             document.querySelectorAll(".choice-btn").forEach((btn) => {
-                btn.addEventListener("click", (e) => {
+                btn.addEventListener("click", async (e) => {
                     document
                         .querySelectorAll(".choice-btn")
                         .forEach((b) => (b.disabled = true));
                     const rt = performance.now() - startTime;
-                    socket.send(
-                        JSON.stringify({
-                            type: "submit",
-                            response: e.target.getAttribute("data-val"),
-                            rt: Math.round(rt),
-                        }),
-                    );
+                    const response = e.target.getAttribute("data-val");
+
+                    try {
+                        await fetch('/submit', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                client_id: clientId,
+                                response: response,
+                                rt: Math.round(rt)
+                            })
+                        });
+                    } catch (err) {
+                        console.error('Failed to submit response:', err);
+                    }
+
                     switchPhase("FINISHED");
                 });
             });
 
-            connectWebSocket();
+            connectSSE();
         </script>
     </body>
 </html>
