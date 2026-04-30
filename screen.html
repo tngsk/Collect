@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <title>SITU Workshop Screen</title>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    <style>
-        body { margin: 0; background-color: #0f0f11; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #chart-container { width: 90vw; height: 80vh; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div id="chart-container">
-        <h1 style="text-align: center; font-family: sans-serif; color: #555;">Waiting for data...</h1>
+<body class="h-screen w-screen bg-base-100 text-base-content flex justify-center items-center overflow-hidden">
+    <div id="chart-container" class="w-[90vw] h-[80vh] flex justify-center items-center">
+        <h1 class="text-3xl text-base-content/50 font-sans text-center">Waiting for data...</h1>
     </div>
 
     <script>
