@@ -44,7 +44,7 @@
         <script>
             let clientId = localStorage.getItem("situs_client_id");
             if (!clientId) {
-                clientId = "user_" + Math.random().toString(36).substr(2, 9);
+                clientId = "user_" + Math.random().toString(36).slice(2, 11);
                 localStorage.setItem("situs_client_id", clientId);
             }
 
