@@ -49,6 +49,20 @@ class ExperimentState:
 
 state = ExperimentState()
 DATA_FILE = "data.jsonl"
+CLIENT_HTML: str = ""
+SCREEN_HTML: str = ""
+
+try:
+    with open("client.html", "r", encoding="utf-8") as f:
+        CLIENT_HTML = f.read()
+    with open("screen.html", "r", encoding="utf-8") as f:
+        SCREEN_HTML = f.read()
+except FileNotFoundError as e:
+    print(f"[FATAL ERROR] 必須ファイルが見つかりません: {e}")
+    sys.exit(1)
+except Exception as e:
+    print(f"[FATAL ERROR] ファイル読み込み中にエラーが発生しました: {e}")
+    sys.exit(1)
 
 
 def save_data(data_dict):
@@ -61,14 +75,12 @@ def save_data(data_dict):
 # ==========================================
 @app.get("/")
 async def get_client_html():
-    with open("client.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    return HTMLResponse(CLIENT_HTML)
 
 
 @app.get("/screen")
 async def get_screen_html():
-    with open("screen.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    return HTMLResponse(SCREEN_HTML)
 
 
 @app.get("/controller")
