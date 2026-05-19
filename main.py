@@ -37,6 +37,13 @@ for q in config["questions"]:
 # FastAPIのバリデーション用に動的なEnumクラスを作成
 AllowedPhase = Enum("AllowedPhase", allowed_phases_dict)
 
+# Load HTML templates into memory for performance
+with open("client.html", "r", encoding="utf-8") as f:
+    CLIENT_HTML = f.read()
+
+with open("screen.html", "r", encoding="utf-8") as f:
+    SCREEN_HTML = f.read()
+
 app = FastAPI()
 
 
@@ -61,14 +68,12 @@ def save_data(data_dict):
 # ==========================================
 @app.get("/")
 async def get_client_html():
-    with open("client.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    return HTMLResponse(CLIENT_HTML)
 
 
 @app.get("/screen")
 async def get_screen_html():
-    with open("screen.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    return HTMLResponse(SCREEN_HTML)
 
 
 @app.get("/controller")
