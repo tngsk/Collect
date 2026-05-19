@@ -46,6 +46,9 @@ with open("screen.html", "r", encoding="utf-8") as f:
 
 app = FastAPI()
 
+with open("screen.html", "r", encoding="utf-8") as f:
+    SCREEN_HTML = f.read()
+
 
 class ExperimentState:
     def __init__(self):
