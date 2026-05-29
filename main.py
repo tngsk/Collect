@@ -235,8 +235,12 @@ async def update_screen():
         if df_filtered.empty:
             counts = pd.DataFrame({"response": ["No Data"], "count": [0]})
         else:
-            # 通常の集計処理
-            counts = df_filtered["response"].value_counts().reset_index()  # type: ignore[union-attr]
+            # 通常の集計処理: 列を取り出し、Seriesであることを型チェッカーに保証させる
+            response_series = df_filtered["response"]
+            if not isinstance(response_series, pd.Series):
+                return
+
+            counts = response_series.value_counts().reset_index()
             counts.columns = ["response", "count"]
 
         title_text = f"RESULT: {target_phase}"  # グラフにタイトルをつける
@@ -284,7 +288,9 @@ async def sse_client(request: Request):
         state.client_queues.add(q)
         try:
             # 接続時に現在のフェーズを送信
-            initial_msg = json.dumps({"type": "phase_change", "phase": state.current_phase.value})
+            initial_msg = json.dumps(
+                {"type": "phase_change", "phase": state.current_phase.value}
+            )
             yield f"data: {initial_msg}\n\n"
 
             while True:
