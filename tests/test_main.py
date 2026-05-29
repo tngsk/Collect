@@ -8,8 +8,10 @@ sys.modules["plotly"] = MagicMock()
 sys.modules["plotly.express"] = MagicMock()
 sys.modules["fastapi"] = MagicMock()
 sys.modules["fastapi.responses"] = MagicMock()
+sys.modules["pydantic"] = MagicMock()
 
 import main
+
 
 def test_save_data_appends_to_file(tmp_path, monkeypatch):
     # Create a temporary file path
@@ -35,6 +37,7 @@ def test_save_data_appends_to_file(tmp_path, monkeypatch):
         assert len(lines) == 2
         assert json.loads(lines[0]) == data1
         assert json.loads(lines[1]) == data2
+
 
 def test_save_data_preserves_existing_content(tmp_path, monkeypatch):
     temp_file = tmp_path / "existing_data.jsonl"
